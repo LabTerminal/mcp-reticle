@@ -45,11 +45,15 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # HTTP/SSE transport
-axum = "0.7"
+axum = { version = "0.7", features = ["ws"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 reqwest = { version = "0.11", features = ["stream", "json"] }
 futures = "0.3"
+
+# WebSocket transport
+tokio-tungstenite = { version = "0.21", features = ["native-tls"] }
+futures-util = "0.3"
 
 # Database - embedded key-value store
 sled = "0.34"

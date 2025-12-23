@@ -7,7 +7,7 @@ import { useReticleStore } from '@/store'
 import { invoke } from '@tauri-apps/api/core'
 
 // Transport type definitions matching Rust backend
-type TransportType = 'stdio' | 'http'
+type TransportType = 'stdio' | 'http' | 'streamable' | 'websocket'
 
 interface StdioConfig {
   type: 'stdio'
@@ -21,7 +21,19 @@ interface HttpConfig {
   proxy_port: number
 }
 
-type TransportConfig = StdioConfig | HttpConfig
+interface StreamableConfig {
+  type: 'streamable'
+  server_url: string
+  proxy_port: number
+}
+
+interface WebSocketConfig {
+  type: 'websocket'
+  server_url: string
+  proxy_port: number
+}
+
+type TransportConfig = StdioConfig | HttpConfig | StreamableConfig | WebSocketConfig
 
 export function ProxyControls() {
   const [isRunning, setIsRunning] = useState(false)
@@ -33,9 +45,13 @@ export function ProxyControls() {
   const [command, setCommand] = useState('python3')
   const [args, setArgs] = useState('scripts/mock-mcp-server.py')
 
-  // HTTP config
+  // HTTP config (shared by legacy SSE and streamable transports)
   const [serverUrl, setServerUrl] = useState('http://localhost:8080')
   const [proxyPort, setProxyPort] = useState(3001)
+
+  // WebSocket config
+  const [wsServerUrl, setWsServerUrl] = useState('ws://localhost:8080/ws')
+  const [wsProxyPort, setWsProxyPort] = useState(3002)
 
   const { clearLogs } = useReticleStore()
 
@@ -51,9 +67,22 @@ export function ProxyControls() {
           command: command.trim(),
           args: argsList,
         }
-      } else {
+      } else if (transportType === 'http') {
         transportConfig = {
           type: 'http',
+          server_url: serverUrl.trim(),
+          proxy_port: proxyPort,
+        }
+      } else if (transportType === 'websocket') {
+        transportConfig = {
+          type: 'websocket',
+          server_url: wsServerUrl.trim(),
+          proxy_port: wsProxyPort,
+        }
+      } else {
+        // streamable transport
+        transportConfig = {
+          type: 'streamable',
           server_url: serverUrl.trim(),
           proxy_port: proxyPort,
         }
@@ -140,14 +169,37 @@ export function ProxyControls() {
                   stdio
                 </button>
                 <button
+                  onClick={() => setTransportType('streamable')}
+                  className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                    transportType === 'streamable'
+                      ? 'bg-emerald-500/20 text-emerald-400'
+                      : 'text-zinc-400 hover:text-zinc-300'
+                  }`}
+                  title="Streamable HTTP Transport (MCP 2025-03-26)"
+                >
+                  Streamable
+                </button>
+                <button
                   onClick={() => setTransportType('http')}
                   className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
                     transportType === 'http'
                       ? 'bg-emerald-500/20 text-emerald-400'
                       : 'text-zinc-400 hover:text-zinc-300'
                   }`}
+                  title="Legacy HTTP+SSE Transport (MCP 2024-11-05)"
                 >
-                  HTTP/SSE
+                  SSE (Legacy)
+                </button>
+                <button
+                  onClick={() => setTransportType('websocket')}
+                  className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                    transportType === 'websocket'
+                      ? 'bg-emerald-500/20 text-emerald-400'
+                      : 'text-zinc-400 hover:text-zinc-300'
+                  }`}
+                  title="WebSocket Transport for real-time bidirectional communication"
+                >
+                  WebSocket
                 </button>
               </div>
 
@@ -169,8 +221,8 @@ export function ProxyControls() {
                 </>
               )}
 
-              {/* HTTP/SSE configuration */}
-              {transportType === 'http' && (
+              {/* HTTP configuration (streamable and legacy SSE) */}
+              {(transportType === 'http' || transportType === 'streamable') && (
                 <>
                   <Input
                     placeholder="Server URL (e.g., http://localhost:8080)"
@@ -188,6 +240,25 @@ export function ProxyControls() {
                 </>
               )}
 
+              {/* WebSocket configuration */}
+              {transportType === 'websocket' && (
+                <>
+                  <Input
+                    placeholder="WebSocket URL (e.g., ws://localhost:8080/ws)"
+                    value={wsServerUrl}
+                    onChange={(e) => setWsServerUrl(e.target.value)}
+                    className="h-9 w-64 bg-zinc-900/50 border-white/10 text-xs"
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Proxy Port (e.g., 3002)"
+                    value={wsProxyPort}
+                    onChange={(e) => setWsProxyPort(parseInt(e.target.value) || 3002)}
+                    className="h-9 w-32 bg-zinc-900/50 border-white/10 text-xs"
+                  />
+                </>
+              )}
+
               <Button
                 variant="default"
                 size="sm"
@@ -195,7 +266,8 @@ export function ProxyControls() {
                 disabled={
                   isLoading ||
                   (transportType === 'stdio' && !command.trim()) ||
-                  (transportType === 'http' && !serverUrl.trim())
+                  ((transportType === 'http' || transportType === 'streamable') && !serverUrl.trim()) ||
+                  (transportType === 'websocket' && !wsServerUrl.trim())
                 }
                 className="h-9 px-4 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/50 text-xs font-medium"
               >
@@ -261,6 +333,10 @@ export function ProxyControls() {
             <span className="font-mono">
               {transportType === 'stdio'
                 ? `${command} ${args}`
+                : transportType === 'streamable'
+                ? `Streamable HTTP: ${serverUrl} → :${proxyPort}`
+                : transportType === 'websocket'
+                ? `WebSocket: ${wsServerUrl} → :${wsProxyPort}`
                 : `HTTP/SSE Proxy: ${serverUrl} → :${proxyPort}`
               }
             </span>
@@ -271,18 +347,23 @@ export function ProxyControls() {
       {!isRunning && !showConfig && (
         <div className="px-4 pb-3 pt-2 border-t border-white/5 bg-zinc-950/50">
           <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-1 h-16 bg-emerald-500/30 rounded-full" />
+            <div className="flex-shrink-0 w-1 h-24 bg-emerald-500/30 rounded-full" />
             <div className="flex-1">
               <p className="text-xs text-zinc-400 leading-relaxed">
                 <span className="font-medium text-zinc-300">Debug MCP Servers:</span> Click Configure to specify your MCP server.
-                Choose <span className="font-mono text-emerald-400">stdio</span> for process-based servers or <span className="font-mono text-emerald-400">HTTP/SSE</span> for web-based servers.
-                Reticle will intercept all traffic in real-time.
+                Choose <span className="font-mono text-emerald-400">stdio</span> for process-based servers,{' '}
+                <span className="font-mono text-emerald-400">Streamable</span> for MCP 2025+ HTTP servers,{' '}
+                <span className="font-mono text-emerald-400">SSE (Legacy)</span> for older HTTP+SSE servers, or{' '}
+                <span className="font-mono text-emerald-400">WebSocket</span> for real-time bidirectional communication.
               </p>
               <p className="text-xs text-zinc-500 mt-1.5">
                 stdio example: <span className="font-mono text-emerald-400">python3 scripts/mock-mcp-server.py</span>
               </p>
               <p className="text-xs text-zinc-500 mt-0.5">
-                HTTP/SSE example: <span className="font-mono text-emerald-400">http://localhost:8080</span> on proxy port <span className="font-mono text-emerald-400">3001</span>
+                Streamable HTTP example: <span className="font-mono text-emerald-400">http://localhost:8080</span> (MCP 2025-03-26 spec)
+              </p>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                WebSocket example: <span className="font-mono text-emerald-400">ws://localhost:8080/ws</span>
               </p>
             </div>
           </div>

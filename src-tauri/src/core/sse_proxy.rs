@@ -327,6 +327,26 @@ async fn send_message_handler(
                     .await
                     .unwrap_or_else(|_| "Unknown error".to_string());
                 eprintln!("[SSE PROXY] Server error: {status} - {error_text}");
+
+                // Emit error as a log event so it appears in the UI
+                let error_id = generate_sse_message_id();
+                let error_json = serde_json::json!({
+                    "error": {
+                        "code": status.as_u16(),
+                        "message": format!("Server returned {status}"),
+                        "data": error_text
+                    }
+                });
+                let error_entry = LogEntry::new(
+                    error_id,
+                    state.session_id.clone(),
+                    Direction::Out,
+                    error_json,
+                );
+                if let Err(e) = state.app_handle.emit("log-event", &error_entry) {
+                    warn!("Failed to emit error log event: {}", e);
+                }
+
                 Ok(Json(SendMessageResponse {
                     success: false,
                     response: None,
@@ -337,6 +357,26 @@ async fn send_message_handler(
         Err(e) => {
             error!("Failed to send message to MCP server: {}", e);
             eprintln!("[SSE PROXY ERROR] Failed to send: {e}");
+
+            // Emit connection error as a log event so it appears in the UI
+            let error_id = generate_sse_message_id();
+            let error_json = serde_json::json!({
+                "error": {
+                    "code": -32000,
+                    "message": "Connection failed",
+                    "data": format!("{e}")
+                }
+            });
+            let error_entry = LogEntry::new(
+                error_id,
+                state.session_id.clone(),
+                Direction::Out,
+                error_json,
+            );
+            if let Err(emit_err) = state.app_handle.emit("log-event", &error_entry) {
+                warn!("Failed to emit connection error log event: {}", emit_err);
+            }
+
             Ok(Json(SendMessageResponse {
                 success: false,
                 response: None,

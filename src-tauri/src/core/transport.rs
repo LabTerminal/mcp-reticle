@@ -7,8 +7,13 @@ use std::fmt;
 pub enum TransportType {
     /// stdio-based transport (stdin/stdout pipes)
     Stdio,
-    /// HTTP-based transport with Server-Sent Events
+    /// HTTP-based transport with Server-Sent Events (legacy, protocol version 2024-11-05)
     Http,
+    /// Streamable HTTP transport (protocol version 2025-03-26)
+    /// Bidirectional HTTP with optional SSE streaming
+    Streamable,
+    /// WebSocket transport for real-time bidirectional communication
+    WebSocket,
 }
 
 impl fmt::Display for TransportType {
@@ -16,6 +21,8 @@ impl fmt::Display for TransportType {
         match self {
             TransportType::Stdio => write!(f, "stdio"),
             TransportType::Http => write!(f, "http"),
+            TransportType::Streamable => write!(f, "streamable"),
+            TransportType::WebSocket => write!(f, "websocket"),
         }
     }
 }
@@ -26,8 +33,12 @@ impl fmt::Display for TransportType {
 pub enum TransportConfig {
     /// stdio transport configuration
     Stdio { command: String, args: Vec<String> },
-    /// HTTP/SSE transport configuration
+    /// HTTP/SSE transport configuration (legacy)
     Http { server_url: String, proxy_port: u16 },
+    /// Streamable HTTP transport configuration (MCP 2025-03-26)
+    Streamable { server_url: String, proxy_port: u16 },
+    /// WebSocket transport configuration
+    WebSocket { server_url: String, proxy_port: u16 },
 }
 
 impl TransportConfig {
@@ -37,6 +48,8 @@ impl TransportConfig {
         match self {
             TransportConfig::Stdio { .. } => TransportType::Stdio,
             TransportConfig::Http { .. } => TransportType::Http,
+            TransportConfig::Streamable { .. } => TransportType::Streamable,
+            TransportConfig::WebSocket { .. } => TransportType::WebSocket,
         }
     }
 
@@ -45,6 +58,8 @@ impl TransportConfig {
         match self {
             TransportConfig::Stdio { command, .. } => command.is_empty() || command == "demo",
             TransportConfig::Http { .. } => false,
+            TransportConfig::Streamable { .. } => false,
+            TransportConfig::WebSocket { .. } => false,
         }
     }
 }
@@ -69,6 +84,9 @@ pub enum TransportError {
 
     #[error("HTTP error: {0}")]
     Http(String),
+
+    #[error("WebSocket error: {0}")]
+    WebSocket(String),
 
     #[error("Invalid configuration: {0}")]
     InvalidConfig(String),
