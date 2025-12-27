@@ -3288,6 +3288,8 @@ dependencies = [
  "dirs 5.0.1",
  "futures",
  "futures-util",
+ "getrandom 0.2.16",
+ "hex",
  "reqwest 0.11.27",
  "reticle-core",
  "serde",

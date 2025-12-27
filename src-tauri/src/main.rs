@@ -20,6 +20,7 @@ mod core;
 mod error;
 mod events;
 mod mock_data;
+mod security;
 mod state;
 mod storage;
 

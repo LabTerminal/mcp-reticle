@@ -12,7 +12,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex;
-use tower_http::cors::{Any, CorsLayer};
+use axum::http::{HeaderValue, Method};
+use tower_http::cors::CorsLayer;
 use tracing::{debug, error, info, warn};
 
 use super::protocol::{Direction, LogEntry, MessageType};
@@ -53,11 +54,15 @@ pub async fn start_sse_proxy(
         recorder,
     };
 
-    // CORS layer for cross-origin requests
+    // CORS layer - restricted to localhost origins for security
     let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_origin([
+            "http://localhost".parse::<HeaderValue>().unwrap(),
+            "http://127.0.0.1".parse::<HeaderValue>().unwrap(),
+            "tauri://localhost".parse::<HeaderValue>().unwrap(),
+        ])
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers(tower_http::cors::Any);
 
     // Create Axum router with both GET (receive) and POST (send) endpoints
     let app = Router::new()
@@ -67,8 +72,8 @@ pub async fn start_sse_proxy(
         .with_state(state)
         .layer(cors);
 
-    // Bind to address
-    let addr = format!("0.0.0.0:{proxy_port}");
+    // Bind to localhost only for security (prevents external access)
+    let addr = format!("127.0.0.1:{proxy_port}");
     let listener = tokio::net::TcpListener::bind(&addr)
         .await
         .map_err(|e| format!("Failed to bind to {addr}: {e}"))?;

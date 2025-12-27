@@ -141,6 +141,10 @@ pub struct ServerInfo {
 }
 
 /// Active session recorder
+///
+/// This struct is Clone-able because it uses Arc<Mutex<>> for shared state,
+/// allowing it to be safely shared across async tasks without holding locks.
+#[derive(Clone)]
 pub struct SessionRecorder {
     session_id: String,
     session_name: String,

@@ -50,9 +50,14 @@ pub async fn load_demo_data(
         emit_log_event(&app_handle, log.clone())?;
 
         // Record message if recording is active
+        // Clone the recorder to avoid holding lock across await
         if let Ok(json) = serde_json::from_str::<serde_json::Value>(&log.content) {
-            let recorder_lock = recorder.lock().await;
-            if let Some(ref rec) = *recorder_lock {
+            let recorder_clone = {
+                let recorder_lock = recorder.lock().await;
+                recorder_lock.clone()
+            };
+
+            if let Some(rec) = recorder_clone {
                 // Determine direction based on log direction string
                 let direction = match log.direction.as_str() {
                     "in" => MessageDirection::ToServer,
@@ -64,7 +69,6 @@ pub async fn load_demo_data(
                     eprintln!("Failed to record demo message: {e}");
                 }
             }
-            drop(recorder_lock);
         }
 
         // Delay between messages

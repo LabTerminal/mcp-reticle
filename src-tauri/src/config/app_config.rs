@@ -10,6 +10,71 @@ use serde::{Deserialize, Serialize};
 pub struct AppConfig {
     /// Demo mode settings
     pub demo: DemoConfig,
+    /// Security settings
+    #[serde(default)]
+    pub security: SecurityConfig,
+}
+
+/// Security configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SecurityConfig {
+    /// Allowed commands that can be executed as MCP servers.
+    /// If empty, all commands are allowed (less secure, development mode).
+    /// For production, specify allowed executables like ["npx", "node", "python", "uvx"].
+    pub allowed_commands: Vec<String>,
+
+    /// Allowed CORS origins for HTTP proxies.
+    /// If empty, defaults to localhost only for security.
+    /// Use ["*"] to allow all origins (not recommended for production).
+    pub cors_origins: Vec<String>,
+}
+
+impl Default for SecurityConfig {
+    fn default() -> Self {
+        Self {
+            // Default to common MCP server launchers
+            allowed_commands: vec![
+                "npx".to_string(),
+                "node".to_string(),
+                "python".to_string(),
+                "python3".to_string(),
+                "uvx".to_string(),
+                "uv".to_string(),
+                "deno".to_string(),
+                "bun".to_string(),
+            ],
+            // Default to localhost origins only
+            cors_origins: vec![
+                "http://localhost".to_string(),
+                "http://127.0.0.1".to_string(),
+                "tauri://localhost".to_string(),
+            ],
+        }
+    }
+}
+
+impl SecurityConfig {
+    /// Check if a command is allowed to be executed
+    pub fn is_command_allowed(&self, command: &str) -> bool {
+        // If allowlist is empty, allow all (development mode)
+        if self.allowed_commands.is_empty() {
+            return true;
+        }
+
+        // Extract the base command name (handle paths like /usr/bin/python)
+        let base_command = std::path::Path::new(command)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or(command);
+
+        self.allowed_commands.iter().any(|allowed| {
+            let allowed_base = std::path::Path::new(allowed)
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or(allowed);
+            base_command == allowed_base
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,5 +199,54 @@ mod tests {
 
         assert_eq!(demo1.session_id, demo2.session_id);
         assert_eq!(demo1.message_delay_ms, demo2.message_delay_ms);
+    }
+
+    #[test]
+    fn test_security_config_default() {
+        let config = SecurityConfig::default();
+
+        assert!(!config.allowed_commands.is_empty());
+        assert!(config.allowed_commands.contains(&"npx".to_string()));
+        assert!(config.allowed_commands.contains(&"python".to_string()));
+        assert!(!config.cors_origins.is_empty());
+    }
+
+    #[test]
+    fn test_is_command_allowed_basic() {
+        let config = SecurityConfig::default();
+
+        assert!(config.is_command_allowed("npx"));
+        assert!(config.is_command_allowed("node"));
+        assert!(config.is_command_allowed("python"));
+        assert!(!config.is_command_allowed("rm"));
+        assert!(!config.is_command_allowed("curl"));
+    }
+
+    #[test]
+    fn test_is_command_allowed_with_path() {
+        let config = SecurityConfig::default();
+
+        assert!(config.is_command_allowed("/usr/bin/python"));
+        assert!(config.is_command_allowed("/usr/local/bin/npx"));
+        assert!(!config.is_command_allowed("/bin/rm"));
+    }
+
+    #[test]
+    fn test_is_command_allowed_empty_allowlist() {
+        let config = SecurityConfig {
+            allowed_commands: vec![],
+            cors_origins: vec![],
+        };
+
+        // Empty allowlist should allow all commands (dev mode)
+        assert!(config.is_command_allowed("anything"));
+        assert!(config.is_command_allowed("rm"));
+    }
+
+    #[test]
+    fn test_app_config_has_security() {
+        let config = AppConfig::default();
+
+        assert!(!config.security.allowed_commands.is_empty());
     }
 }

@@ -46,6 +46,7 @@ export function ControlBar() {
   const [args, setArgs] = useState('scripts/mock-mcp-server.py')
   const [serverUrl, setServerUrl] = useState('http://localhost:8080')
   const [proxyPort, setProxyPort] = useState(3001)
+  const [sessionName, setSessionName] = useState('')
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false)
@@ -154,10 +155,16 @@ export function ControlBar() {
         transportConfig = { type: 'http', server_url: serverUrl, proxy_port: proxyPort }
       }
 
-      await invoke('start_proxy_v2', { transportConfig })
+      // Pass session name if provided, otherwise backend generates default
+      const invokeArgs: { transportConfig: TransportConfig; sessionName?: string } = { transportConfig }
+      if (sessionName.trim()) {
+        invokeArgs.sessionName = sessionName.trim()
+      }
+      await invoke('start_proxy_v2', invokeArgs)
       setIsProxyRunning(true)
       toast.success('Proxy started successfully')
       setShowConfig(false)
+      setSessionName('') // Reset for next session
     } catch (error) {
       toast.error('Failed to start proxy', {
         description: error instanceof Error ? error.message : 'Unknown error',
@@ -345,6 +352,13 @@ export function ControlBar() {
                       />
                     </>
                   )}
+
+                  <Input
+                    value={sessionName}
+                    onChange={(e) => setSessionName(e.target.value)}
+                    placeholder="Session name (optional)"
+                    className="h-8 text-xs"
+                  />
 
                   <Button onClick={startProxy} size="sm" className="w-full h-7 text-xs">
                     <Play className="h-3 w-3 mr-1" />

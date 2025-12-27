@@ -4,6 +4,7 @@
 //! including start/stop recording, listing sessions, and exporting.
 
 use crate::core::session_recorder::SessionRecorder;
+use crate::security::generate_secure_session_id;
 use crate::state::AppState;
 use crate::storage::SessionInfo;
 use tauri::State;
@@ -20,7 +21,7 @@ pub async fn start_recording(
         return Err("Recording is already active".to_string());
     }
 
-    let session_id = generate_session_id();
+    let session_id = generate_secure_session_id();
     let name = session_name.unwrap_or_else(|| format!("Session {}", chrono_format(&session_id)));
 
     // Get transport type from proxy state
@@ -168,18 +169,12 @@ pub struct RecordingStatus {
 
 // Helper functions
 
-fn generate_session_id() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    format!("session-{timestamp}")
-}
-
 fn chrono_format(session_id: &str) -> String {
-    // Extract timestamp from session-{timestamp} format
-    if let Some(ts_str) = session_id.strip_prefix("session-") {
+    // Extract timestamp from session-{timestamp}-{random} format
+    // or legacy session-{timestamp} format
+    if let Some(rest) = session_id.strip_prefix("session-") {
+        // Get the timestamp part (first segment after "session-")
+        let ts_str = rest.split('-').next().unwrap_or(rest);
         if let Ok(ts) = ts_str.parse::<i64>() {
             // Convert timestamp to human-readable format
             // Simple implementation without chrono dependency
@@ -237,37 +232,21 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_session_id_format() {
-        let session_id = generate_session_id();
-
-        // Should start with "session-"
-        assert!(session_id.starts_with("session-"));
-
-        // Rest should be a valid number (timestamp)
-        let timestamp_str = session_id.strip_prefix("session-").unwrap();
-        let timestamp: u64 = timestamp_str.parse().unwrap();
-
-        // Should be a reasonable Unix timestamp (after 2020)
-        assert!(timestamp > 1577836800); // Jan 1, 2020
-    }
-
-    #[test]
-    fn test_generate_session_id_unique() {
-        let id1 = generate_session_id();
-        // Sleep briefly to ensure timestamp differs
-        std::thread::sleep(std::time::Duration::from_millis(1100));
-        let id2 = generate_session_id();
-
-        // IDs should be different (assuming at least 1 second apart)
-        assert_ne!(id1, id2);
-    }
-
-    #[test]
     fn test_chrono_format_valid_session_id() {
         // Test with a known timestamp: 1700000000 = 2023-11-14 22:13:20 UTC
         let formatted = chrono_format("session-1700000000");
 
         // Should return a formatted date string
+        assert!(formatted.contains("2023")); // Year
+        assert!(formatted.contains(":")); // Time separator
+    }
+
+    #[test]
+    fn test_chrono_format_secure_session_id() {
+        // Test with new format: session-{timestamp}-{random}
+        let formatted = chrono_format("session-1700000000-abcdef1234567890");
+
+        // Should return a formatted date string (extracts timestamp)
         assert!(formatted.contains("2023")); // Year
         assert!(formatted.contains(":")); // Time separator
     }

@@ -19,6 +19,7 @@ impl MockData {
 
         let session = SessionStartEvent {
             id: session_id.clone(),
+            name: format!("Demo: {server_name}"),
             started_at: base_timestamp,
         };
 

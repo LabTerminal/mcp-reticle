@@ -39,6 +39,8 @@ tokio = { version = "1", features = ["full"] }
 bytes = "1.5"
 async-trait = "0.1"
 dirs = "5.0"
+getrandom = "0.2"
+hex = "0.4"
 
 # Error handling
 thiserror = "1.0"

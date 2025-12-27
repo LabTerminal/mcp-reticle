@@ -7,6 +7,7 @@ use crate::error::{AppError, Result};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionStartEvent {
     pub id: String,
+    pub name: String,
     pub started_at: u64,
 }
 
