@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Logo } from '@/components/Logo'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
+import { ServerFilter, TagFilter } from '@/components/SessionTags'
 
 export function Sidebar() {
   const {
@@ -262,7 +263,7 @@ export function Sidebar() {
               <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Filters
               </h3>
-              {(filters.method || filters.direction) && (
+              {(filters.method || filters.direction || filters.serverName || (filters.tags && filters.tags.length > 0)) && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -272,6 +273,22 @@ export function Sidebar() {
                   Clear
                 </Button>
               )}
+            </div>
+
+            {/* Server Filter */}
+            <div className="mb-3">
+              <ServerFilter
+                selectedServer={filters.serverName}
+                onSelectServer={(server) => setFilters({ serverName: server })}
+              />
+            </div>
+
+            {/* Tag Filter */}
+            <div className="mb-3">
+              <TagFilter
+                selectedTags={filters.tags || []}
+                onSelectTags={(tags) => setFilters({ tags })}
+              />
             </div>
 
             {/* Direction Filter */}
