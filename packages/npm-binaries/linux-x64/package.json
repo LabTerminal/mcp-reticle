@@ -1,0 +1,13 @@
+{
+  "name": "@reticle/linux-x64",
+  "version": "0.1.0",
+  "description": "Reticle binary for Linux x64",
+  "os": ["linux"],
+  "cpu": ["x64"],
+  "license": "BSL-1.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/labterminal/reticle"
+  },
+  "files": ["bin/reticle"]
+}

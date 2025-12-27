@@ -143,7 +143,9 @@ FOR_CLAUDE.md
 VISION.md
 
 # Shell scripts (replaced by Justfile)
+# Note: scripts/install.sh is NOT ignored (distribution installer)
 scripts/*.sh
+!scripts/install.sh
 
 # Rust incremental compilation artifacts
 *.rmeta

@@ -1,0 +1,289 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            artifact: reticle-darwin-x86_64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact: reticle-darwin-aarch64
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: reticle-linux-x86_64
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: reticle-linux-aarch64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact: reticle-windows-x86_64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross-compilation tools (Linux ARM64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build CLI
+        run: |
+          cargo build --release --target ${{ matrix.target }} --manifest-path crates/reticle-cli/Cargo.toml
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist
+          cp crates/reticle-cli/target/${{ matrix.target }}/release/reticle dist/
+          cd dist
+          tar -czvf ${{ matrix.artifact }}.tar.gz reticle
+          shasum -a 256 ${{ matrix.artifact }}.tar.gz > ${{ matrix.artifact }}.tar.gz.sha256
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir dist
+          cp crates/reticle-cli/target/${{ matrix.target }}/release/reticle.exe dist/
+          cd dist
+          7z a ${{ matrix.artifact }}.zip reticle.exe
+          certutil -hashfile ${{ matrix.artifact }}.zip SHA256 > ${{ matrix.artifact }}.zip.sha256
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/*
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir release
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.sha256" \) -exec cp {} release/ \;
+          cp scripts/install.sh release/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release/*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
+
+  publish-npm:
+    name: Publish to npm
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare npm packages
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+
+          # Update versions in all package.json files
+          for pkg in packages/npm packages/npm-binaries/*; do
+            if [ -f "$pkg/package.json" ]; then
+              jq ".version = \"$VERSION\"" "$pkg/package.json" > tmp.json && mv tmp.json "$pkg/package.json"
+            fi
+          done
+
+          # Copy binaries to platform packages
+          for artifact_dir in artifacts/reticle-*; do
+            artifact_name=$(basename "$artifact_dir")
+
+            case "$artifact_name" in
+              reticle-darwin-aarch64)
+                mkdir -p packages/npm-binaries/darwin-arm64/bin
+                cp "$artifact_dir/reticle" packages/npm-binaries/darwin-arm64/bin/
+                ;;
+              reticle-darwin-x86_64)
+                mkdir -p packages/npm-binaries/darwin-x64/bin
+                cp "$artifact_dir/reticle" packages/npm-binaries/darwin-x64/bin/
+                ;;
+              reticle-linux-x86_64)
+                mkdir -p packages/npm-binaries/linux-x64/bin
+                cp "$artifact_dir/reticle" packages/npm-binaries/linux-x64/bin/
+                ;;
+              reticle-linux-aarch64)
+                mkdir -p packages/npm-binaries/linux-arm64/bin
+                cp "$artifact_dir/reticle" packages/npm-binaries/linux-arm64/bin/
+                ;;
+              reticle-windows-x86_64)
+                mkdir -p packages/npm-binaries/win32-x64/bin
+                cp "$artifact_dir/reticle.exe" packages/npm-binaries/win32-x64/bin/
+                ;;
+            esac
+          done
+
+      - name: Publish platform packages
+        run: |
+          for pkg in packages/npm-binaries/*; do
+            if [ -d "$pkg" ] && [ -f "$pkg/package.json" ]; then
+              cd "$pkg"
+              npm publish --access public || echo "Failed to publish $(basename $pkg), may already exist"
+              cd -
+            fi
+          done
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish main package
+        run: |
+          cd packages/npm
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare Python package
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+
+          # Update version in pyproject.toml
+          sed -i "s/version = \".*\"/version = \"$VERSION\"/" packages/python/pyproject.toml
+          sed -i "s/__version__ = \".*\"/__version__ = \"$VERSION\"/" packages/python/reticle/__init__.py
+
+          # Copy binaries into package structure
+          mkdir -p packages/python/reticle/bin
+
+          for artifact_dir in artifacts/reticle-*; do
+            artifact_name=$(basename "$artifact_dir")
+
+            case "$artifact_name" in
+              reticle-darwin-aarch64)
+                mkdir -p packages/python/reticle/bin/darwin-aarch64
+                cp "$artifact_dir/reticle" packages/python/reticle/bin/darwin-aarch64/
+                ;;
+              reticle-darwin-x86_64)
+                mkdir -p packages/python/reticle/bin/darwin-x86_64
+                cp "$artifact_dir/reticle" packages/python/reticle/bin/darwin-x86_64/
+                ;;
+              reticle-linux-x86_64)
+                mkdir -p packages/python/reticle/bin/linux-x86_64
+                cp "$artifact_dir/reticle" packages/python/reticle/bin/linux-x86_64/
+                ;;
+              reticle-linux-aarch64)
+                mkdir -p packages/python/reticle/bin/linux-aarch64
+                cp "$artifact_dir/reticle" packages/python/reticle/bin/linux-aarch64/
+                ;;
+              reticle-windows-x86_64)
+                mkdir -p packages/python/reticle/bin/windows-x86_64
+                cp "$artifact_dir/reticle.exe" packages/python/reticle/bin/windows-x86_64/
+                ;;
+            esac
+          done
+
+      - name: Build wheel
+        run: |
+          pip install build
+          cd packages/python
+          python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: packages/python/dist/
+          password: ${{ secrets.PYPI_TOKEN }}
+
+  update-homebrew:
+    name: Update Homebrew
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download SHA256 files
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Update Homebrew formula
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+
+          # Read SHA256 hashes
+          DARWIN_ARM64_SHA=$(cat artifacts/reticle-darwin-aarch64/reticle-darwin-aarch64.tar.gz.sha256 | awk '{print $1}')
+          DARWIN_X64_SHA=$(cat artifacts/reticle-darwin-x86_64/reticle-darwin-x86_64.tar.gz.sha256 | awk '{print $1}')
+          LINUX_ARM64_SHA=$(cat artifacts/reticle-linux-aarch64/reticle-linux-aarch64.tar.gz.sha256 | awk '{print $1}')
+          LINUX_X64_SHA=$(cat artifacts/reticle-linux-x86_64/reticle-linux-x86_64.tar.gz.sha256 | awk '{print $1}')
+
+          # Update formula
+          sed -i "s/version \".*\"/version \"$VERSION\"/" packages/homebrew/reticle.rb
+          sed -i "s/PLACEHOLDER_SHA256_DARWIN_ARM64/$DARWIN_ARM64_SHA/" packages/homebrew/reticle.rb
+          sed -i "s/PLACEHOLDER_SHA256_DARWIN_X64/$DARWIN_X64_SHA/" packages/homebrew/reticle.rb
+          sed -i "s/PLACEHOLDER_SHA256_LINUX_ARM64/$LINUX_ARM64_SHA/" packages/homebrew/reticle.rb
+          sed -i "s/PLACEHOLDER_SHA256_LINUX_X64/$LINUX_X64_SHA/" packages/homebrew/reticle.rb
+
+          echo "Updated formula:"
+          cat packages/homebrew/reticle.rb
+
+      - name: Push to homebrew-tap
+        uses: dmnemec/copy_file_to_another_repo_action@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        with:
+          source_file: 'packages/homebrew/reticle.rb'
+          destination_repo: 'labterminal/homebrew-tap'
+          destination_folder: 'Formula'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+          user_name: 'github-actions[bot]'
+          commit_message: 'Update reticle to ${{ github.ref_name }}'
