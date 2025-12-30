@@ -46,7 +46,7 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ## Documentation
 
-Full documentation at [github.com/labterminal/reticle](https://github.com/labterminal/reticle)
+Full documentation at [github.com/labterminal/mcp-reticle](https://github.com/labterminal/mcp-reticle)
 
 ## License
 

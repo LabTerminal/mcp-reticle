@@ -36,5 +36,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Core proxy functionality
 - Basic UI implementation
 
-[Unreleased]: https://github.com/labterminal/reticle/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/labterminal/reticle/releases/tag/v0.1.0
+[Unreleased]: https://github.com/labterminal/mcp-reticle/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/labterminal/mcp-reticle/releases/tag/v0.1.0

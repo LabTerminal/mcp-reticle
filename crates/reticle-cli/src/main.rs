@@ -351,8 +351,8 @@ async fn run_daemon(socket: String, port: Option<u16>, verbose: bool) -> ExitCod
 }
 
 /// GitHub repository for releases
-const GITHUB_REPO: &str = "labterminal/reticle";
-const GITHUB_RELEASES_URL: &str = "https://github.com/labterminal/reticle/releases";
+const GITHUB_REPO: &str = "labterminal/mcp-reticle";
+const GITHUB_RELEASES_URL: &str = "https://github.com/labterminal/mcp-reticle/releases";
 
 /// Launch the Reticle GUI
 ///

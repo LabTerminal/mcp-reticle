@@ -27,9 +27,9 @@ classifiers = [
 requires-python = ">=3.8"
 
 [project.urls]
-Homepage = "https://github.com/labterminal/reticle"
-Repository = "https://github.com/labterminal/reticle"
-Documentation = "https://github.com/labterminal/reticle#readme"
+Homepage = "https://github.com/labterminal/mcp-reticle"
+Repository = "https://github.com/labterminal/mcp-reticle"
+Documentation = "https://github.com/labterminal/mcp-reticle#readme"
 
 [project.scripts]
 mcp-reticle = "mcp_reticle:main"
