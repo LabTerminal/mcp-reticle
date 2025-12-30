@@ -1,4 +1,4 @@
-# Reticle
+# mcp-reticle
 
 **The Wireshark for the Model Context Protocol**
 
@@ -9,15 +9,15 @@ Reticle intercepts, visualizes, and profiles JSON-RPC traffic between your LLM a
 ## Installation
 
 ```bash
-npm install -g reticle
+npm install -g mcp-reticle
 ```
 
 ## Usage
 
-Wrap your MCP server command with `reticle`:
+Wrap your MCP server command with `mcp-reticle run`:
 
 ```bash
-reticle --port 3001 -- npx -y @modelcontextprotocol/server-filesystem /path/to/dir
+mcp-reticle run --name my-server -- npx -y @modelcontextprotocol/server-filesystem /path/to/dir
 ```
 
 ### Claude Desktop Configuration
@@ -28,8 +28,8 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "filesystem": {
-      "command": "reticle",
-      "args": ["--port", "3001", "--", "npx", "-y", "@modelcontextprotocol/server-filesystem", "/Users/me/work"]
+      "command": "mcp-reticle",
+      "args": ["run", "--name", "filesystem", "--", "npx", "-y", "@modelcontextprotocol/server-filesystem", "/Users/me/work"]
     }
   }
 }

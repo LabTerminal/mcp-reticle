@@ -4,7 +4,7 @@
   "description": "Real-time debugging proxy for MCP (Model Context Protocol) servers",
   "keywords": ["mcp", "debugging", "proxy", "ai", "llm", "model-context-protocol"],
   "author": "Reticle Team",
-  "license": "BSL-1.1",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/labterminal/mcp-reticle"
