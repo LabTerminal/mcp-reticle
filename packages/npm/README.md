@@ -50,4 +50,4 @@ Full documentation at [github.com/labterminal/mcp-reticle](https://github.com/la
 
 ## License
 
-BSL-1.1
+MIT

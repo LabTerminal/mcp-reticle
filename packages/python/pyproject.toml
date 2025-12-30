@@ -7,7 +7,7 @@ name = "mcp-reticle"
 version = "0.1.0"
 description = "Real-time debugging proxy for MCP (Model Context Protocol) servers"
 readme = "README.md"
-license = "BSL-1.1"
+license = "MIT"
 authors = [
     { name = "Reticle Team" }
 ]

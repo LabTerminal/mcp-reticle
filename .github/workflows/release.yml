@@ -419,6 +419,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout main
           git add Formula/mcp-reticle.rb
           git commit -m "Update Homebrew formula for ${{ github.ref_name }}"
-          git push
+          git push origin main
