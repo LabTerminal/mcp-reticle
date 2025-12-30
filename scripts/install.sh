@@ -6,7 +6,7 @@ set -euo pipefail
 
 VERSION="${RETICLE_VERSION:-latest}"
 INSTALL_DIR="${RETICLE_INSTALL_DIR:-$HOME/.local/bin}"
-GITHUB_REPO="labterminal/reticle"
+GITHUB_REPO="labterminal/mcp-reticle"
 
 # Colors
 RED='\033[0;31m'

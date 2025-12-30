@@ -224,7 +224,7 @@ jobs:
           files: release/*
           generate_release_notes: true
           draft: false
-          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') }}
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
 
   publish-npm:
     name: Publish to npm
@@ -373,6 +373,8 @@ jobs:
     name: Update Homebrew
     needs: release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -393,23 +395,19 @@ jobs:
           LINUX_X64_SHA=$(cat artifacts/reticle-cli-linux-x86_64/reticle-cli-linux-x86_64.tar.gz.sha256 | awk '{print $1}')
 
           # Update formula
-          sed -i "s/version \".*\"/version \"$VERSION\"/" packages/homebrew/mcp-reticle.rb
-          sed -i "s/PLACEHOLDER_SHA256_DARWIN_ARM64/$DARWIN_ARM64_SHA/" packages/homebrew/mcp-reticle.rb
-          sed -i "s/PLACEHOLDER_SHA256_DARWIN_X64/$DARWIN_X64_SHA/" packages/homebrew/mcp-reticle.rb
-          sed -i "s/PLACEHOLDER_SHA256_LINUX_ARM64/$LINUX_ARM64_SHA/" packages/homebrew/mcp-reticle.rb
-          sed -i "s/PLACEHOLDER_SHA256_LINUX_X64/$LINUX_X64_SHA/" packages/homebrew/mcp-reticle.rb
+          sed -i "s/version \".*\"/version \"$VERSION\"/" Formula/mcp-reticle.rb
+          sed -i "s/PLACEHOLDER_SHA256_DARWIN_ARM64/$DARWIN_ARM64_SHA/" Formula/mcp-reticle.rb
+          sed -i "s/PLACEHOLDER_SHA256_DARWIN_X64/$DARWIN_X64_SHA/" Formula/mcp-reticle.rb
+          sed -i "s/PLACEHOLDER_SHA256_LINUX_ARM64/$LINUX_ARM64_SHA/" Formula/mcp-reticle.rb
+          sed -i "s/PLACEHOLDER_SHA256_LINUX_X64/$LINUX_X64_SHA/" Formula/mcp-reticle.rb
 
           echo "Updated formula:"
-          cat packages/homebrew/mcp-reticle.rb
+          cat Formula/mcp-reticle.rb
 
-      - name: Push to homebrew-tap
-        uses: dmnemec/copy_file_to_another_repo_action@main
-        env:
-          API_TOKEN_GITHUB: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-        with:
-          source_file: 'packages/homebrew/mcp-reticle.rb'
-          destination_repo: 'labterminal/homebrew-tap'
-          destination_folder: 'Formula'
-          user_email: 'github-actions[bot]@users.noreply.github.com'
-          user_name: 'github-actions[bot]'
-          commit_message: 'Update mcp-reticle to ${{ github.ref_name }}'
+      - name: Commit updated formula
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/mcp-reticle.rb
+          git commit -m "Update Homebrew formula for ${{ github.ref_name }}"
+          git push

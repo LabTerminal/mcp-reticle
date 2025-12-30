@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/labterminal/reticle/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
+  <a href="https://github.com/labterminal/mcp-reticle/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
   <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-Compliant-00F0FF.svg" alt="MCP Compliant" /></a>
   <a href="#"><img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg" alt="Platform" /></a>
   <a href="#"><img src="https://img.shields.io/badge/Rust-1.75+-orange.svg" alt="Rust 1.75+" /></a>
@@ -66,23 +66,31 @@ Building with MCP today feels like 1990s web development without a browser conso
 
 ---
 
-## Quick Start
-
-### 1. Install Reticle
+## Installation
 
 ```bash
-# Build from source
-git clone https://github.com/labterminal/reticle.git
-cd reticle
-just build
+# npm
+npm install -g mcp-reticle
 
-# Or for development
-just dev
+# pip
+pip install mcp-reticle
+
+# Homebrew
+brew install labterminal/mcp-reticle/mcp-reticle
+
+# From source
+git clone https://github.com/labterminal/mcp-reticle.git
+cd mcp-reticle
+just build
 ```
 
-### 2. The Wrapper Pattern
+---
 
-Instead of running your MCP server directly, wrap it with `reticle` (the CLI proxy):
+## Quick Start
+
+### 1. Wrap your MCP server
+
+Instead of running your MCP server directly, wrap it with `mcp-reticle run`:
 
 **Before (Claude Desktop Config):**
 ```json
@@ -101,16 +109,81 @@ Instead of running your MCP server directly, wrap it with `reticle` (the CLI pro
 {
   "mcpServers": {
     "filesystem": {
-      "command": "reticle",
-      "args": ["--port", "3001", "--", "npx", "-y", "@modelcontextprotocol/server-filesystem", "/Users/me/work"]
+      "command": "mcp-reticle",
+      "args": ["run", "--name", "filesystem", "--", "npx", "-y", "@modelcontextprotocol/server-filesystem", "/Users/me/work"]
     }
   }
 }
 ```
 
-### 3. Open the Dashboard
+### 2. Launch the GUI
 
-Launch the Reticle desktop app. All traffic from your wrapped servers appears in real-time.
+```bash
+mcp-reticle ui
+```
+
+All traffic from your wrapped servers appears in real-time.
+
+---
+
+## CLI Commands
+
+Reticle provides a powerful CLI with multiple modes:
+
+### `mcp-reticle run` — Wrap stdio MCP servers
+
+```bash
+# Basic usage
+mcp-reticle run -- npx -y @modelcontextprotocol/server-github
+
+# With a custom name (recommended)
+mcp-reticle run --name github -- npx -y @modelcontextprotocol/server-github
+
+# Standalone log mode (no GUI needed)
+mcp-reticle run --log -- npx -y @modelcontextprotocol/server-memory
+
+# JSON output format
+mcp-reticle run --log --format json -- python -m my_mcp_server
+```
+
+### `mcp-reticle proxy` — HTTP reverse proxy
+
+For remote MCP servers using HTTP/SSE/WebSocket transport:
+
+```bash
+mcp-reticle proxy --name api --upstream http://localhost:8080 --listen 3001
+```
+
+### `mcp-reticle ui` — Launch the GUI
+
+```bash
+# Launch the GUI dashboard
+mcp-reticle ui
+
+# Launch in background
+mcp-reticle ui --detach
+
+# Development mode (cargo tauri dev)
+mcp-reticle ui --dev
+```
+
+### `mcp-reticle daemon` — Standalone telemetry hub
+
+For headless/server deployments without the GUI:
+
+```bash
+mcp-reticle daemon --socket /tmp/reticle.sock
+```
+
+---
+
+## CLI vs GUI Usage
+
+| Mode | Use Case |
+|------|----------|
+| **CLI + GUI** | Full debugging experience. Wrap servers with `mcp-reticle run`, view in GUI with `mcp-reticle ui`. |
+| **CLI only (--log)** | Lightweight logging without GUI. Great for CI/CD or servers. |
+| **CLI + Daemon** | Headless telemetry aggregation. Multiple CLI instances stream to one daemon. |
 
 ---
 
@@ -157,31 +230,29 @@ Edit `~/Library/Application Support/Claude/claude_desktop_config.json`:
 {
   "mcpServers": {
     "my-server": {
-      "command": "reticle",
-      "args": ["--port", "3001", "--", "python", "-m", "my_mcp_server"]
+      "command": "mcp-reticle",
+      "args": ["run", "--name", "my-server", "--", "python", "-m", "my_mcp_server"]
     }
   }
 }
 ```
 
-### Cline (VS Code)
-
-In Cline's MCP configuration:
+### Cursor / Cline (VS Code)
 
 ```json
 {
-  "mcp.servers": {
+  "mcpServers": {
     "my-server": {
-      "command": "reticle",
-      "args": ["--port", "3001", "--", "node", "server.js"]
+      "command": "mcp-reticle",
+      "args": ["run", "--name", "my-server", "--", "node", "server.js"]
     }
   }
 }
 ```
 
-### 5ire / Other Clients
+### Other Clients
 
-Same pattern — wrap your server command with `reticle`.
+Same pattern — wrap your server command with `mcp-reticle run --name <name> --`.
 
 ---
 
@@ -189,10 +260,10 @@ Same pattern — wrap your server command with `reticle`.
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   MCP Client    │────▶│     Reticle     │────▶│   MCP Server    │
-│ (Claude, Cline) │◀────│    (reticle)    │◀────│  (your tool)    │
+│   MCP Client    │────▶│  mcp-reticle    │────▶│   MCP Server    │
+│ (Claude, Cline) │◀────│     (CLI)       │◀────│  (your tool)    │
 └─────────────────┘     └────────┬────────┘     └─────────────────┘
-                                 │
+                                 │ Unix Socket
                                  ▼
                         ┌─────────────────┐
                         │  Reticle GUI    │
@@ -202,10 +273,11 @@ Same pattern — wrap your server command with `reticle`.
 
 ### How It Works
 
-1. **reticle** wraps your MCP server process
-2. All stdin/stdout traffic passes through the proxy
-3. Messages are forwarded to the Reticle GUI via Tauri events
-4. Zero-copy forwarding ensures microsecond latency
+1. **mcp-reticle run** wraps your MCP server process
+2. All stdin/stdout traffic passes through the proxy transparently
+3. Telemetry streams to the GUI via Unix socket (`/tmp/reticle.sock`)
+4. Zero-copy forwarding ensures <100μs overhead
+5. CLI instances can run independently (fail-open design)
 
 ### Technology Stack
 
@@ -238,28 +310,29 @@ Same pattern — wrap your server command with `reticle`.
 ## Project Structure
 
 ```
-reticle/
+mcp-reticle/
 ├── crates/
-│   ├── reticle-core/       # Core library (protocol, token counting, storage)
-│   └── reticle-cli/        # Standalone CLI proxy (publishable to crates.io)
-├── src-tauri/              # Tauri desktop app (depends on reticle-core)
+│   ├── reticle-core/       # Shared library (protocol, token counting, events)
+│   └── reticle-cli/        # CLI binary (mcp-reticle)
+├── src-tauri/              # Tauri desktop app (reticle-app)
 │   ├── src/
-│   │   ├── core/           # Proxy implementations (uses reticle-core)
-│   │   ├── commands/       # Tauri commands
-│   │   └── main.rs         # Entry point
+│   │   ├── core/           # Proxy implementations, socket bridge
+│   │   ├── commands/       # Tauri IPC commands
+│   │   └── main.rs
 │   └── Cargo.toml
 ├── frontend/               # React + TypeScript UI
 │   ├── src/
 │   │   ├── components/     # LogStream, Inspector, Sidebar, etc.
 │   │   ├── store/          # Zustand state management
-│   │   └── App.tsx         # Main app
+│   │   └── App.tsx
 │   └── package.json
-├── scripts/                # Python test utilities
-│   ├── mock-mcp-agent.py   # Mock MCP client for testing
-│   ├── mock-mcp-server.py  # Mock MCP server for testing
-│   └── mock-mcp-sse-server.py  # Mock SSE server for testing
-├── justfile                # Task runner commands
-└── README.md
+├── packages/               # Distribution packages
+│   ├── npm/                # npm: mcp-reticle
+│   ├── npm-binaries/       # npm: @mcp-reticle/darwin-arm64, etc.
+│   └── python/             # PyPI: mcp-reticle
+├── Formula/                # Homebrew formula
+├── scripts/                # Test utilities
+└── justfile
 ```
 
 ---

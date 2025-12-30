@@ -7,9 +7,9 @@
   "license": "BSL-1.1",
   "repository": {
     "type": "git",
-    "url": "https://github.com/labterminal/reticle"
+    "url": "https://github.com/labterminal/mcp-reticle"
   },
-  "homepage": "https://github.com/labterminal/reticle",
+  "homepage": "https://github.com/labterminal/mcp-reticle",
   "bin": {
     "mcp-reticle": "bin/reticle.js"
   },

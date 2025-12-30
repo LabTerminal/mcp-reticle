@@ -1,5 +1,5 @@
 # Reticle - MCP Protocol Inspector
-# https://github.com/labterminal/reticle
+# https://github.com/labterminal/mcp-reticle
 
 # Default recipe - show available commands
 default:
